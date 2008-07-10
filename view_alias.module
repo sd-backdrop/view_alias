@@ -1,0 +1,325 @@
+<?php
+/**
+ * $Id$
+ */
+
+/**
+ * @file
+ *  view_alias.module
+ *
+ * Allow bulk creation of url aliases for certain views that use term id as the only argument.
+ *
+ */
+
+// constants for the update operations
+define("VIEW_ALIAS_UPDATE_NOTHING", 0);
+define("VIEW_ALIAS_CREATE_NEW_DELETE", 1);
+define("VIEW_ALIAS_DELETE", 2);
+define("VIEW_ALIAS_TEST", 5);
+
+/**
+ * Implementation of hook_menu().
+ *
+ */
+function view_alias_menu($may_cache) {
+  $items = array();
+  if ($may_cache) {
+    $items[] = array(
+      'path' => 'admin/settings/view_alias',
+      'title' => t('View Aliases'),
+      'description' => t('Automatically create an url alias for viewname/term-name'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('view_alias_admin_settings'),
+      'access' => user_access('administer site configuration'),
+      'type' => MENU_NORMAL_ITEM,
+    ); 
+  }
+  return $items;
+} 
+
+/**
+ * Admin settings for module 
+ */
+function view_alias_admin_settings() {
+  $form = array();
+
+  $form['view-alias-fs'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Generate Aliases'),
+    '#collapsed' => TRUE,
+    '#collapsible' => TRUE,
+
+  );
+
+  $form['view-alias-recur'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Recurring Aliases'),
+    '#collapsed' => FALSE,
+  );
+
+  $views = _get_views_using_termid(); 
+  
+  //$form['header'] = array('#value' => "<h3>Alias $view->name</h3");
+  foreach ($views as $view) {
+    $form['view-alias-fs']['view_alias-'. $view->name] = array(
+      '#type' => 'fieldset',
+      '#title' => t("$view->name"),
+      '#collapsed' => FALSE,
+      '#collapsible' => FALSE,
+    );
+    
+    $form['view-alias-fs']['view_alias-'. $view->name]['view_alias_view_'. $view->vid .'_vid'] = array(
+      '#type' => 'hidden',
+      '#value' => $view->vid,
+    );
+
+    // i dont think i need this. replace with link to the view edit page
+    /**
+    $form['view_alias-'. $view->name]['view_alias_view_'. $view->vid .'_url'] = array(
+      '#type' => 'textfield',
+      '#title' => t('View URL'),
+      '#default_value' => variable_get('view_alias_view_url', $view->url), 
+      '#description' => t('Value defaults to the view url, but you can replace this if needed'),
+    );
+    **/
+
+    $vocabs = taxonomy_get_vocabularies();
+    $options = array(-999 => "NONE");
+    foreach ($vocabs as $vocab) {
+      $options[$vocab->vid] = $vocab->name;
+    }
+    
+    $form['view-alias-fs']['view_alias-'. $view->name]['view_alias_view_'. $view->vid .'_taxonomy'] = array(
+      '#type' => 'select',
+      '#title' => t('Vocabulary to alias'),
+      '#default_value' => -999,
+      '#options' => $options,
+      '#description' => t('select the vocabulary that the view is intended to use as term id arguments'),
+    );
+    
+   
+    $form['view-alias-fs']['view_alias-'. $view->name]['view_alias_view_'. $view->vid .'_create'] = array(
+      '#type' => 'checkbox',
+      '#title' => t("Update aliases for <strong><i>$view->name</i></strong>."),
+      '#default_value' => 0,
+    );
+
+  }  
+
+  // copied from pathauto admin form 
+  $actions = array(
+    t('Do nothing. Leave the old alias intact.'),
+    t('Create a new alias. Delete the old alias.'),
+    t('Delete aliases for selected views.')
+  );
+
+  $form['view-alias-fs']["view_alias_update_action"] = array(
+    '#type' => 'radios',
+    '#title' => t('Update action'), 
+    '#default_value' => VIEW_ALIAS_UPDATE_NOTHING,
+    '#options' => $actions,
+    '#description' => t('What should view alias do when updating an existing content item which already has an alias?')
+  );
+  
+  $form['view-alias-fs']['view-alias-update_btn'] = array(
+    '#type' => 'submit',
+    '#value' => t('Update Aliases'),
+  );
+
+  foreach ($views as $view) {
+    $form['view-alias-recur']['view_alias-'. $view->name] = array(
+      '#type' => 'fieldset',
+      '#title' => t("$view->name (". l($view->url, $view->url, array("target" => "_blank")) .")"),
+    );
+ 
+    $form['view-alias-recur']['view_alias-'. $view->name]['view_alias_view_'. $view->vid .'_recur'] = array(
+      '#type' => 'checkbox',
+      '#title' => t("Create/Update/Delete aliases for <strong><i>$view->name</i></strong> on term creation."),
+      '#default_value' => variable_get("view_alias_view_". $view->vid ."_recur", 0),
+    );
+
+    $vocabs = taxonomy_get_vocabularies();
+    $options = array(-999 => "NONE");
+    foreach ($vocabs as $vocab) {
+      $options[$vocab->vid] = $vocab->name;
+    }
+    
+    $form['view-alias-recur']['view_alias-'. $view->name]['view_alias_view_'. $view->vid .'_taxonomy_recur'] = array(
+      '#type' => 'select',
+      '#title' => t('Vocabulary to alias'),
+      '#default_value' => variable_get('view_alias_view_'. $view->vid .'_taxonomy_recur', -999),
+      '#options' => $options,
+      '#description' => t('select the vocabulary that the view will be aliased with'),
+    );
+  
+
+  }
+
+  return system_settings_form($form);
+  //return $form;
+}
+
+
+//function view_alias_admin_settings_validate($form_id, $form_values) {
+function view_alias_admin_settings_submit($form_id, $form_values) {
+
+  $views = _get_views_using_termid(); 
+  if ($form_values['op'] == "Update Aliases" && $form_values['view_alias_update_action'] > 0) {
+    $views_to_alias = array();
+    foreach ($views as $view) {
+
+      $create_view      = $form_values['view_alias_view_'. $view->vid .'_create'];
+      $alias_vocabulary = $form_values['view_alias_view_'. $view->vid .'_taxonomy'];
+      $update_action    = $form_values['view_alias_update_action'];
+
+      if ($create_view) {
+        $terms = taxonomy_get_tree($alias_vocabulary);
+        foreach ($terms as $term) {
+          _do_view_alias_operations($view, $term->tid, $update_action);
+        }
+      }
+    }
+  }
+  elseif ($form_values['op'] == "Save configuration") {
+    $recur_views = array();
+
+    foreach ($views as $view) {
+      variable_set("view_alias_view_". $view->vid ."_recur", $form_values['view_alias_view_'. $view->vid .'_recur']);
+      variable_set("view_alias_view_". $view->vid ."_taxonomy_recur",
+        $form_values['view_alias_view_'. $view->vid .'_taxonomy_recur']);
+
+      if (variable_get("view_alias_view_". $view->vid ."_recur", FALSE))
+        $recur_views[$form_values['view_alias_view_'. $view->vid .'_taxonomy_recur']] = $view;
+
+    }
+    variable_set("view_alias_recurring_views", $recur_views);
+
+    drupal_set_message("Recurring settings saved.");
+  }
+  else
+    drupal_set_message("You chose to do nothing");
+}
+
+/**
+ *
+ * create/delete the url aliases for the view and taxonomy term id
+ *
+ *
+ * @param $view
+ *  The view object
+ * @param $tid
+ *  taxonomy term id
+ * @param $op
+ *  one of three operations, VIEW_ALIAS_CREATE_NEW_DELETE, VIEW_ALIAS_DELETE, 
+ *  and VIEW_ALIAS_UPDATE_NOTHING.
+ *
+ */
+function _do_view_alias_operations($view, $tid, $op) {
+  // available from token module
+  if ($view) {
+    switch ($op) {
+      case VIEW_ALIAS_CREATE_NEW_DELETE:
+        $pattern = $view->url ."/[catpath]";  
+        $term = taxonomy_get_term($tid); 
+        $alias = token_replace($pattern, "view_alias", $term);
+        path_set_alias("$view->url/$tid", $alias);
+        drupal_set_message("Setting <i>$alias</i> as alias for $view->url/$tid");
+        break;
+      
+      case VIEW_ALIAS_DELETE:
+        $query = "DELETE FROM {url_alias} where src = '%s'";
+        db_query($query, $view->url ."/$tid");
+        drupal_set_message("Removed <i>$view->url/$tid</i> as an alias.");
+        break;
+
+      default:
+        drupal_set_message("The operation, $op, was attempted, but failed.", "error");
+        break;
+    }
+  }
+  else {
+    drupal_set_message("View information not found.", 'error');
+    return;
+  }
+}
+
+
+/**
+ * get the views that use taxonomy id's as arguments
+ * return array of small view objects with view id, view name,
+ * and view url
+ * @return
+ *  array of objects with vid, name, and url attributes
+ *
+ */
+function _get_views_using_termid() {
+  $views = array();
+  $query = "SELECT v.vid, v.name, v.url "; 
+  $query .= "FROM {view_view} v ";
+  $query .= "JOIN {view_argument} a on v.vid = a.vid ";
+  $query .= "WHERE v.page = 1 and a.type = 'taxid'";
+
+  $result = db_query($query);
+  while ($view = db_fetch_object($result)) {
+    $views[] = $view;
+  } 
+  return $views;
+  
+}
+
+/**
+ * Implementation of hook_token_values()
+ */
+function view_alias_token_values($type, $object = NULL, $options = array()) {
+  include_once(drupal_get_path("module", "pathauto") ."/pathauto.inc");
+
+  $values = array();
+  switch ($type) {
+    case 'view_alias':
+      $term = $object;
+
+      $tid = $term->tid;
+      $parents = taxonomy_get_parents_all($tid);
+      $catpath = array();
+      
+      // borrowed from the way pathauto does it.
+      foreach ($parents as $parent) {
+        // Replace any / characters in individual terms which might create confusing URLs
+        // check path_auto_ignore words for special characters
+        $catpath[] = pathauto_cleanstring(check_plain(preg_replace('/\//', '', $parent->name)));
+      }
+      
+      // reverse the array to get the right order. this is to prevent trailing slashes '/'
+      $values['catpath'] = strtolower(implode("/", array_reverse($catpath))); 
+      break;
+  }
+  return $values;
+}
+
+/**
+ * Implementation of hook_token_list()
+ */
+function view_alias_token_list($type = 'all') {
+  $tokens['view_alias']['catpath'] = t("hyphenated term path.");
+  return $tokens;
+}
+
+/**
+ * Implementation of hook_taxonomy
+ * recur_views is keyed with the vocabulary id of the terms to alias with, the value is the view infomation.
+ */
+function view_alias_taxonomy($op, $type, $array = NULL) {
+  $recur_views = variable_get("view_alias_recurring_views", array());
+  if (empty($recur_views)) {
+    return;
+  }
+
+  if ($type == "term" && ($op == 'insert' || $op == 'update')) {
+    if (in_array($array['vid'], array_keys($recur_views))) {
+      $view = $recur_views[$array['vid']];
+      path_set_alias($view->url ."/". $array['tid'], $view->url ."/". $array['name']);
+    }
+  }
+}
+
+//todo: maybe add cron as well?
