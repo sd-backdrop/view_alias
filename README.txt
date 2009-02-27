@@ -10,19 +10,19 @@ to do the repetition for me.
 SETUP
 1. untar the tarball into your drupal modules directory
 2. enable the module
-3. visit admin/settings/view_alias for configuration options.
+3. visit admin/build/path/pathauto for configuration options.
 
 Generating Aliases
-This is our bulk process to build all of the view aliases.
-Click the "Generate Aliases" field link for the fieldset that will display a section for each view that accepts term id arguments.
-To create aliases:
-1. Inside the fieldset for the view that you wish to create aliases for:
-  a. select the vocabulary
-  b. check the "Update aliases for <viewname>" checkbox
-  c. select an Update Action
-  d. click the "Update Aliases" button.
-    Now you will see a list of all the aliases created.
+View Alias is mostly integrated with pathauto.  So expand the "View Alias"
+settings fieldset to select the views to alias.
 
+In the 6.x version the views with term arguments and page displays are
+automatically displayed for you to choose from.  Simply select the views
+to alias and check the "Bulk generate aliases ..." box and Save the
+configuration to kick off the generation.
+
+
+/** NOT DONE YET **/
 Recurring Aliases
 This works of hook_taxonomy to update aliases when terms are updated, created or deleted.
 For each view:
@@ -35,12 +35,9 @@ FAQ
 WHY NOT JUST USE <view-name>/<term-name>?
 I kept running into duplicate terms when not using the full path.  I also found that people were turned off by some of the special characters that showed up in the browser bar.
 
-WHAT ABOUT PATHAUTO?
-I tried adding this at first to pathauto, but got bogged down in some of the details and tokens.  So I just created a new module
-that requires pathauto to be enabled.  I use some of the pathauto functions for generating the names.  Also, one important thing
-to point out is that the aliases point to a view and dont run off the taxonomy/term path, so your aliases would end up like
-myviewname/some_term_name aliased to taxonomy/term/20
-
+NO TOKENS?
+Yep, no tokens, I didn't really see the need for them.  But if you have a good
+reason for them.. let me know and we can figure something out.
 
 Eric Mckenna, Phase2 Technology
 emckenna@phase2technology.com
