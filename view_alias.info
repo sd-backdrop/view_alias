@@ -1,6 +1,6 @@
-; $Id$
-name = "View TermID Aliases"
-description = "Automatically create url aliases for views with a single termid argument"
-package = "Views"
-dependencies = path taxonomy views pathauto
-version = "5.x-1.x"
+name = ViewAlias
+description = enhance pathauto to create path alias based on views and term arguments.
+core = 6.x
+package = Other
+dependencies[] = pathauto
+dependencies[] = views 
