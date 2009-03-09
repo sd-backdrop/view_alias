@@ -101,7 +101,6 @@ function view_alias_form_alter(&$form, $form_state, $form_id) {
   }
 }
 
-
 /**
  *
  * find the views that can be aliased.
@@ -118,42 +117,45 @@ function view_alias_form_alter(&$form, $form_state, $form_id) {
  * )
  */
 function _get_aliasable_displays() {
-  $aliasable_views = array();
+  $aliasable_views = cache_get('view_alias_aliasabe_view_displays');
 
-  $sql = "SELECT DISTINCT(vv.name) FROM drupal_views_view vv JOIN drupal_views_display vd ";
-  $sql .= "ON vv.vid = vd.vid where vd.display_plugin = 'page';";
-  
-  $result = db_query($sql);
-  while($row = db_fetch_object($result)) {
-    $aview = views_get_view($row->name);
-    $alias = NULL;
-    $alias->view_name = $row->name;
-    $default_vocab_arg;
+  if ( empty($aliasable_views) ) {
+
+    $sql = "SELECT DISTINCT(vv.name) FROM {views_view} vv JOIN {views_display} vd ";
+    $sql .= "ON vv.vid = vd.vid where vd.display_plugin = 'page';";
     
-    foreach($aview->display as $key => $display) {
-      // check default for args and save for later
-      $alias->display_name = $key;
+    $result = db_query($sql);
+    while($row = db_fetch_object($result)) {
+      $aview = views_get_view($row->name);
+      $alias = NULL;
+      $alias->view_name = $row->name;
+      $default_vocab_arg;
       
-      if($key == 'default') {
-        $alias->varg = _find_view_arguments($display);
-        continue;
-      }
-      // its some sort of page cause the query says so.
-      else {
-        //dpr($display);
-        // add the page and replace overridden args.
-        $alias->path = $display->display_options['path'];       
-        $overriden = _find_view_arguments($display);
-        if($overridden) { 
-          $alias->varg = $overridden;
+      foreach($aview->display as $key => $display) {
+        // check default for args and save for later
+        $alias->display_name = $key;
+        
+        if($key == 'default') {
+          $alias->varg = _find_view_arguments($display);
+          continue;
         }
+        // its some sort of page cause the query says so.
+        else {
+          //dpr($display);
+          // add the page and replace overridden args.
+          $alias->path = $display->display_options['path'];       
+          $overriden = _find_view_arguments($display);
+          if($overridden) { 
+            $alias->varg = $overridden;
+          }
+        }
+        if(!empty($alias->path) && !empty($alias->varg))   
+          $aliasable_views[] = drupal_clone($alias);
       }
-      if(!empty($alias->path) && !empty($alias->varg))   
-        $aliasable_views[] = drupal_clone($alias);
+
     }
-
+    cache_set('view_alias_aliasable_view_displays', $aliasable_views, 'cache', CACHE_TEMPORARY); 
   }
-
   return $aliasable_views;
 }
 
