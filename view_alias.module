@@ -84,11 +84,12 @@ function view_alias_form_alter(&$form, $form_state, $form_id) {
     $form['view_alias']['views_to_alias'] = array(
       '#type' => 'fieldset',
       '#title' => t('Views available for aliasing'),
-      '#description' => t('Check the views for which aliases should be bulk generated.'),
+      '##description' => t('Check the views for which aliases should be bulk generated.'),
       '#weight' => -1,
     );
 
     $aliasable = _get_aliasable_displays();
+
     foreach($aliasable as $alias) {
       $voc = taxonomy_vocabulary_load($alias->varg);
       $form['view_alias']['views_to_alias']["pathauto_view_alias_{$alias->path}"] = array(
@@ -117,10 +118,9 @@ function view_alias_form_alter(&$form, $form_state, $form_id) {
  * )
  */
 function _get_aliasable_displays() {
-  $aliasable_views = cache_get('view_alias_aliasable_view_displays');
+  $cached_aliases = cache_get('view_alias_aliasable_view_displays');
 
-  if ( empty($aliasable_views) ) {
-
+  if ( empty($cached_aliasess)  || $cached_aliases->data == 0) {
     $sql = "SELECT DISTINCT(vv.name) FROM {views_view} vv JOIN {views_display} vd ";
     $sql .= "ON vv.vid = vd.vid where vd.display_plugin = 'page';";
     
@@ -141,7 +141,6 @@ function _get_aliasable_displays() {
         }
         // its some sort of page cause the query says so.
         else {
-          //dpr($display);
           // add the page and replace overridden args.
           $alias->path = $display->display_options['path'];       
           $overriden = _find_view_arguments($display);
@@ -155,8 +154,10 @@ function _get_aliasable_displays() {
 
     }
     cache_set('view_alias_aliasable_view_displays', $aliasable_views, 'cache', CACHE_TEMPORARY); 
+
+    return $aliasable_views;
   }
-  return $aliasable_views;
+  return $cached_aliases->data;
 }
 
 /**
