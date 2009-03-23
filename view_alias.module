@@ -119,6 +119,7 @@ function view_alias_form_alter(&$form, $form_state, $form_id) {
  */
 function _get_aliasable_displays() {
   $cached_aliases = cache_get('view_alias_aliasable_view_displays');
+  $aliasable_views = array();
 
   if ( empty($cached_aliasess)  || $cached_aliases->data == 0) {
     $sql = "SELECT DISTINCT(vv.name) FROM {views_view} vv JOIN {views_display} vd ";
@@ -126,6 +127,7 @@ function _get_aliasable_displays() {
     
     $result = db_query($sql);
     while($row = db_fetch_object($result)) {
+      // TODO: move this block into separate function for readability
       $aview = views_get_view($row->name);
       $alias = NULL;
       $alias->view_name = $row->name;
@@ -151,11 +153,14 @@ function _get_aliasable_displays() {
         if(!empty($alias->path) && !empty($alias->varg))   
           $aliasable_views[] = drupal_clone($alias);
       }
-
     }
-    cache_set('view_alias_aliasable_view_displays', $aliasable_views, 'cache', CACHE_TEMPORARY); 
 
-    return $aliasable_views;
+    if(!empty($aliasable_views)) {
+      cache_set('view_alias_aliasable_view_displays', $aliasable_views, 'cache', CACHE_TEMPORARY); 
+      return $aliasable_views;
+    }
+
+    return array();
   }
   return $cached_aliases->data;
 }
