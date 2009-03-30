@@ -1,4 +1,5 @@
 <?php
+// $Id$
 
 /**
  * @file
@@ -41,18 +42,31 @@ function view_alias_pathauto_bulkupdate() {
   
   $aliasable = _get_aliasable_displays();
   
-  foreach($aliasable as $alias) {
-    if(variable_get("pathauto_view_alias_{$alias->path}", FALSE)) {
+  foreach ($aliasable as $alias) {
+    if (variable_get("pathauto_view_alias_{$alias->path}", FALSE)) {
       $terms = taxonomy_get_tree($alias->varg);
 
-      foreach($terms as $term) {
+      foreach ($terms as $term) {
         $clean_term_name = pathauto_cleanstring($term->name);
-        path_set_alias("$alias->path/$term->tid","$alias->path/$clean_term_name"); 
-        drupal_set_message("Alias $alias->path/$term->tid to $alias->path/$clean_term_name");
+        $pos = strpos($alias->path, '%');
+        $alias_token;
+        $alias_actual;
+
+        if ($pos === FALSE) {
+          $alias_token = "$alias->path/$clean_term_name"; 
+          $alias_actual = "$alias->path/$term->tid";
+        }
+        else {
+          $alias_token = str_replace('%', $clean_term_name, $alias->path);
+          $alias_actual = str_replace('%', $term->tid, $alias->path);
+        }
+
+        path_set_alias($alias_actual, $alias_token); 
+        drupal_set_message("Alias $alias_token to $alias_actual");
+
       }
     }
   }
-
 }
 
 /**
@@ -63,8 +77,8 @@ function view_alias_pathauto_bulkupdate() {
  */
 function view_alias_path_alias_types() {
   $aliasable = _get_aliasable_displays();
-  foreach($aliasable as $alias) {
-    $objects["$alias->path/%"] = t("View page displays having a path of '$alias->path'");
+  foreach ($aliasable as $alias) {
+    $objects["{$alias->path}%"] = t("View page displays having a path of '$alias->path'");
   }
   return $objects;  
 }
@@ -77,7 +91,7 @@ function view_alias_path_alias_types() {
  *
  */
 function view_alias_form_alter(&$form, $form_state, $form_id) {
-  if($form_id == 'pathauto_admin_settings') {
+  if ($form_id == 'pathauto_admin_settings') {
     
     unset($form['view_alias']['pathauto_view_alias_pattern']);
     unset($form['view_alias']['token_help']);
@@ -90,7 +104,7 @@ function view_alias_form_alter(&$form, $form_state, $form_id) {
 
     $aliasable = _get_aliasable_displays();
 
-    foreach($aliasable as $alias) {
+    foreach ($aliasable as $alias) {
       $voc = taxonomy_vocabulary_load($alias->varg);
       $form['view_alias']['views_to_alias']["pathauto_view_alias_{$alias->path}"] = array(
         '#type' => 'checkbox',
@@ -126,18 +140,18 @@ function _get_aliasable_displays() {
     $sql .= "ON vv.vid = vd.vid where vd.display_plugin = 'page';";
     
     $result = db_query($sql);
-    while($row = db_fetch_object($result)) {
+    while ($row = db_fetch_object($result)) {
       // TODO: move this block into separate function for readability
       $aview = views_get_view($row->name);
       $alias = NULL;
       $alias->view_name = $row->name;
       $default_vocab_arg;
       
-      foreach($aview->display as $key => $display) {
+      foreach ($aview->display as $key => $display) {
         // check default for args and save for later
         $alias->display_name = $key;
         
-        if($key == 'default') {
+        if ($key == 'default') {
           $alias->varg = _find_view_arguments($display);
           continue;
         }
@@ -146,16 +160,16 @@ function _get_aliasable_displays() {
           // add the page and replace overridden args.
           $alias->path = $display->display_options['path'];       
           $overriden = _find_view_arguments($display);
-          if($overridden) { 
+          if ($overridden) { 
             $alias->varg = $overridden;
           }
         }
-        if(!empty($alias->path) && !empty($alias->varg))   
+        if (!empty($alias->path) && !empty($alias->varg))   
           $aliasable_views[] = drupal_clone($alias);
       }
     }
 
-    if(!empty($aliasable_views)) {
+    if (!empty($aliasable_views)) {
       cache_set('view_alias_aliasable_view_displays', $aliasable_views, 'cache', CACHE_TEMPORARY); 
       return $aliasable_views;
     }
@@ -173,7 +187,7 @@ function _find_view_arguments($display) {
   // array_sum is used since if no vocabularies are selected, the sum of the argumets will be 0
   // and we need to make sure there is a vocabular set.
 
-  if($dis_args['validate_argument_type'] == 'tid' && array_sum($dis_args['validate_argument_vocabulary']) > 0) {
+  if ($dis_args['validate_argument_type'] == 'tid' && array_sum($dis_args['validate_argument_vocabulary']) > 0) {
     // remove zero entries
     $no_zeroes = array_diff($dis_args['validate_argument_vocabulary'], array(0));
     return implode(",", $no_zeroes);
