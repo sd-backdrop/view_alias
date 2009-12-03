@@ -121,7 +121,7 @@ function _get_aliasable_displays() {
   $aliasable_views = array();
 
   $sql = "SELECT DISTINCT(vv.name) FROM drupal_views_view vv JOIN drupal_views_display vd ";
-  $sql .= "ON vv.vid = vd.vid where vd.display_plugin = 'page';";
+  $sql .= "ON vv.vid = vd.vid where vd.display_plugin = 'page'";
   
   $result = db_query($sql);
   while($row = db_fetch_object($result)) {
@@ -143,7 +143,7 @@ function _get_aliasable_displays() {
         //dpr($display);
         // add the page and replace overridden args.
         $alias->path = $display->display_options['path'];       
-        $overriden = _find_view_arguments($display);
+        $overridden = _find_view_arguments($display);
         if($overridden) { 
           $alias->varg = $overridden;
         }
