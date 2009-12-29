@@ -120,8 +120,8 @@ function view_alias_form_alter(&$form, $form_state, $form_id) {
 function _get_aliasable_displays() {
   $aliasable_views = array();
 
-  $sql = "SELECT DISTINCT(vv.name) FROM drupal_views_view vv JOIN drupal_views_display vd ";
-  $sql .= "ON vv.vid = vd.vid where vd.display_plugin = 'page'";
+  $sql = "SELECT DISTINCT(vv.name) FROM {views_view} vv JOIN drupal_views_display vd ";
+  $sql .= "ON vv.vid = vd.vid where vd.display_plugin = 'page';";
   
   $result = db_query($sql);
   while($row = db_fetch_object($result)) {
