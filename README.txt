@@ -13,8 +13,15 @@ SETUP
 3. visit admin/build/path/pathauto for configuration options.
 
 Generating Aliases
-View Alias is mostly integrated with pathauto.  So expand the "View Alias"
+View Alias is integrated with pathauto, (admin/build/path/pathauto).  So expand "View Alias Settings"
 settings fieldset to select the views to alias.
+
+Steps to make a view avaialbe to view_alias:
+1. View must exist and have a page display.
+2. Under Arguments, View must have an arg of "Taxonomy: TERM ID".
+3. Under Validator options:
+  a. Set Validator to Taxonomy Term, then select your term vocabulary.
+  b. Set Argument Type to "Term ID"
 
 In the 6.x version the views with term arguments and page displays are
 automatically displayed for you to choose from.  Simply select the views
