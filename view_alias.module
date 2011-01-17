@@ -40,14 +40,30 @@ function view_alias_pathauto($op) {
  */
 function view_alias_pathauto_bulkupdate() {
   $aliasable = _get_aliasable_displays();
+  
+  
   foreach ($aliasable as $alias) {
     if (variable_get("pathauto_view_alias_{$alias->path}", FALSE)) {
-      $terms = taxonomy_get_tree($alias->varg);
+      $terms = _gather_terms_for_alias($alias->varg);
+
       foreach ($terms as $term) {
         view_alias_create_alias($term, $alias, 'bulkupdate');
       }
     }
   }
+}
+
+function _gather_terms_for_alias($validator_vocab_ids) {
+  $vocabs = explode(",", $validator_vocab_ids);
+
+  $terms_to_alias = array();
+  
+  foreach($vocabs as $vocab) {
+    $terms = taxonomy_get_tree($vocab);
+    $terms_to_alias = array_merge($terms_to_alias, $terms);
+  }
+
+  return $terms_to_alias;
 }
 
 /**
@@ -189,7 +205,6 @@ function _get_aliasable_displays() {
       }
       // its some sort of page cause the query says so.
       else {
-        //dpr($display);
         // add the page and replace overridden args.
         $alias->path = $display->display_options['path'];       
         $overridden = _find_view_arguments($display);
@@ -213,11 +228,13 @@ function _find_view_arguments($display) {
   $dis_args = $display->display_options['arguments']['tid'];
   // array_sum is used since if no vocabularies are selected, the sum of the argumets will be 0
   // and we need to make sure there is a vocabular set.
-
+  
   if($dis_args['validate_argument_type'] == 'tid' && array_sum($dis_args['validate_argument_vocabulary']) > 0) {
     // remove zero entries
     $no_zeroes = array_diff($dis_args['validate_argument_vocabulary'], array(0));
-    return implode(",", $no_zeroes);
+    
+    $view_args = implode(",", $no_zeroes);
+    return $view_args;
   }
   return FALSE; 
 }
