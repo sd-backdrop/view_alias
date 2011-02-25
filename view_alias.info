@@ -1,4 +1,3 @@
-; $Id$
 name = "View TermID Aliases"
 description = "Automatically create url aliases for views with a single termid argument"
 package = "Future US"
