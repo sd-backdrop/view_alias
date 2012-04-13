@@ -28,7 +28,6 @@ automatically displayed for you to choose from.  Simply select the views
 to alias and check the "Bulk generate aliases ..." box and Save the
 configuration to kick off the generation.
 
-
 /** NOT DONE YET **/
 Recurring Aliases
 This works of hook_taxonomy to update aliases when terms are updated, created or deleted.
