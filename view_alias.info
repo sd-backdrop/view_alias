@@ -1,6 +1,10 @@
-name = ViewAlias
-description = enhance pathauto to create path alias based on views and term arguments.
-core = 6.x
-package = Other
+name = View Alias
+description = Extend pathauto to create path aliases based on views with term arguments.
+core = 7.x
+package = Views
+
 dependencies[] = pathauto
-dependencies[] = views 
+dependencies[] = views
+
+; Handlers
+files[] = view_alias.module
