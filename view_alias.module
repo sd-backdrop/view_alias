@@ -23,7 +23,7 @@ function view_alias_pathauto($op) {
       $settings['bulkname'] = t('Bulk generate aliases for views with term arguments that are not aliased');
       $settings['bulkdescr'] = t('Generate aliases for all existing views with term arguments
         which do not already have aliases.');
-      
+
       // left out patterns since we dont use them.
       $settings['placeholders'] = array( t('[cat-raw]'), t('The View argument taxonomy name'));
 
@@ -36,13 +36,13 @@ function view_alias_pathauto($op) {
 }
 
 /**
- * 
+ *
  * Do the bulk updating for view aliases
  *
  */
 function view_alias_pathauto_bulkupdate() {
   $aliasable = _get_aliasable_displays();
-  
+
   foreach ($aliasable as $alias) {
     if (variable_get("pathauto_view_alias_{$alias->path}", FALSE)) {
       $terms = _gather_terms_for_alias($alias->varg);
@@ -146,7 +146,7 @@ function view_alias_taxonomy($op, $type, $array = NULL) {
  */
 function view_alias_create_alias($term, $alias, $op) {
   module_load_include('inc', 'pathauto');
-  
+
   // switch around the pattern based on if the term id is contained within the new alias
   if (strpos($alias->path, '%') === FALSE) {
     $source = "$alias->path/$term->tid";
@@ -182,29 +182,31 @@ function view_alias_delete_alias($term, $alias) {
  * build and array of objects, keyed with the view name,
  * having the view path, and the vocab id for the terms used
  * array(
- *   0 => 
- *     object ( 
+ *   0 =>
+ *     object (
  *       'view_name' -> 'viewname'
  *       'display_name' -> 'display name'
  *       'path' -> 'view url path'
  *       'varg' -> 'vocabulary id'
- *     ) 
+ *     )
  * )
  */
 function _get_aliasable_displays() {
   $aliasable_views = array();
 
-  $sql = "SELECT DISTINCT(vv.name) FROM {views_view} vv JOIN {views_display} vd ";
-  $sql .= "ON vv.vid = vd.vid where vd.display_plugin = 'page'";
+  $views = views_get_all_views();
+  foreach ($views as $view) {
+    if (!empty($view->disabled)) {
+      continue;
+    }
+    if (empty($view->display)) {
+      continue;
+    }
 
-  $result = db_query($sql);
-  while($row = db_fetch_object($result)) {
-    $aview = views_get_view($row->name);
-    $alias = NULL;
-    $alias->view_name = $row->name;
-    $default_vocab_arg;
+    $alias = new stdClass;
+    $alias->view_name = $view->name;
 
-    foreach($aview->display as $key => $display) {
+    foreach($view->display as $key => $display) {
       // check default for args and save for later
       $alias->display_name = $key;
 
@@ -245,5 +247,5 @@ function _find_view_arguments($display) {
     $view_args = implode(",", $no_zeroes);
     return $view_args;
   }
-  return FALSE; 
+  return FALSE;
 }
