@@ -208,21 +208,25 @@ function _get_aliasable_displays() {
 
     foreach($view->display as $key => $display) {
       // check default for args and save for later
-      $alias->display_name = $key;
-
       if($key == 'default') {
         $alias->varg = _find_view_arguments($display);
         continue;
       }
-      // its some sort of page cause the query says so.
-      else {
-        // add the page and replace overridden args.
-        $alias->path = $display->display_options['path'];
-        $overridden = _find_view_arguments($display);
-        if($overridden) {
-          $alias->varg = $overridden;
-        }
+
+      // Skip displays with no path
+      if (empty($display->display_options['path'])) {
+        continue;
       }
+
+      $alias->display_name = $key;
+
+      // add the page and replace overridden args.
+      $alias->path = $display->display_options['path'];
+      $overridden = _find_view_arguments($display);
+      if($overridden) {
+        $alias->varg = $overridden;
+      }
+
       if(!empty($alias->path) && !empty($alias->varg))
         $aliasable_views[] = drupal_clone($alias);
     }
