@@ -250,13 +250,15 @@ function _find_view_arguments($display) {
 
   // Scan the display for the first term arg.
   // (No multiple argument support, yet)
+  $view_args = FALSE;
   foreach ($display->display_options['arguments'] as $arg_name => $argument) {
-    if ($argument['validate_type'] == 'taxonomy_term') {
-      $active_vocabularies = array_filter($argument['validate_argument_vocabulary']);
-
-      $view_args = implode(',', $active_vocabularies);
-      return ($view_args) ? $view_args : FALSE;
+    // If we don't support all arguments, we can't create an alias.
+    if ($argument['validate_type'] != 'taxonomy_term') {
+      return FALSE;
     }
+    $active_vocabularies = array_filter($argument['validate_argument_vocabulary']);
+
+    $view_args = implode(',', $active_vocabularies);
   }
-  return FALSE;
+  return ($view_args) ? $view_args : FALSE;
 }
