@@ -64,9 +64,8 @@ function view_alias_bulk_update_batch_process(&$context) {
 function view_alias_path_alias_types() {
   $aliasable = _get_aliasable_displays();
   foreach ($aliasable as $alias) {
-    $objects[$alias->bundle] = t('Views page displays having a path of @path', array('@path' => $alias->path));
+    $objects[$alias->path] = t('Views page displays having a path of @path', array('@path' => $alias->path));
   }
-
   return $objects;
 }
 
