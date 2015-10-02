@@ -28,10 +28,17 @@ function view_alias_pathauto($op) {
   }
 }
 
-
-function view_alias_siple_path($path) {
-  return str_replace(array('%/', '%'), '', $path);
+function view_alias_pattern_id($alias) {
+  $bundle = $alias->view_name . '-' . $alias->display_name;
+  return 'pathauto_view_alias_' . $bundle  . '_pattern';
 }
+
+function view_alias_alias_pattern($path) {
+  return (strpos($path, '%') === FALSE) ?
+    preg_replace('/\/?$/', '/[term:name]', $path) :
+    str_replace(array('%/', '%'), '[term:name]/', $path);
+}
+
 //function view_alias_create_multiple($vid,$alias,$op) {
 /**
  * Batch processing callback; Generate aliases for taxonomy terms.
@@ -39,10 +46,13 @@ function view_alias_siple_path($path) {
 function view_alias_bulk_update_batch_process(&$context) {
   $aliasable = _get_aliasable_displays();
   foreach ($aliasable as $alias) {
-    if (variable_get('pathauto_view_alias_' . view_alias_siple_path($alias->path), FALSE)) {
-      $terms = taxonomy_get_tree(view_alias_first_vid($alias->vid));
-      foreach ($terms as $term) {
-        view_alias_create_alias($term, $alias, 'bulkupdate');
+    if (variable_get(view_alias_pattern_id($alias), FALSE)) {
+      foreach ($alias->varg as $machine_name) {
+        $voc = taxonomy_vocabulary_machine_name_load($machine_name);
+        $terms = taxonomy_get_tree($voc->vid);
+        foreach ($terms as $term) {
+          view_alias_create_alias($term, $alias, 'bulkupdate');
+        }
       }
     }
   }
@@ -55,7 +65,8 @@ function view_alias_bulk_update_batch_process(&$context) {
 function view_alias_path_alias_types() {
   $aliasable = _get_aliasable_displays();
   foreach ($aliasable as $alias) {
-    $objects[view_alias_siple_path($alias->path)] = t('View page displays having a path of @path', array('@path' => $alias->path));
+    $bundle = $alias->view_name . '-' . $alias->display_name;
+    $objects[$bundle] = t('Views page displays having a path of @path', array('@path' => $alias->path));
   }
 
   return $objects;
@@ -79,7 +90,6 @@ function view_alias_vids_tail($vids) {
  * remove the default form settings and add our own since view alias are different from the regular aliases
  */
 function view_alias_form_alter(&$form, &$form_state, $form_id) {
-
   if ($form_id == 'pathauto_patterns_form') {
     unset($form['view_alias']['token_help']);
     unset($form['view_alias']['pathauto_view_alias_pattern']);
@@ -94,7 +104,9 @@ function view_alias_form_alter(&$form, &$form_state, $form_id) {
     $aliasable = _get_aliasable_displays();
     foreach ($aliasable as $alias) {
       $names = implode(', ', $alias->varg);
-      $form['view_alias']['views_to_alias']['pathauto_view_alias_' . view_alias_siple_path($alias->path)] = array(
+      $pattern_id = view_alias_pattern_id($alias);
+      $pattern = view_alias_alias_pattern($alias->path);
+      $form['view_alias']['views_to_alias'][$pattern_id] = array(
         '#type' => 'checkbox',
         '#title' => t('View <strong>@view_name</strong>, display <strong>@display_name</strong>, on path <strong>@path</strong>, with <strong>@name</strong> arguments.',
             array(
@@ -105,7 +117,8 @@ function view_alias_form_alter(&$form, &$form_state, $form_id) {
             )
           ),
         '#weight' => -1,
-        '#default_value' => variable_get('pathauto_view_alias_' . view_alias_siple_path($alias->path), 0),
+        '#return_value' => $pattern,
+        '#default_value' => (variable_get($pattern_id, FALSE) == $pattern),
       );
     }
   }
@@ -117,7 +130,7 @@ function view_alias_form_alter(&$form, &$form_state, $form_id) {
 function view_alias_taxonomy_term_insert($term) {
   $aliasable = _get_aliasable_displays();
   foreach ($aliasable as $alias) {
-    if (in_array($term->vid, array_keys($alias->vid))) {
+    if (in_array($term->vid, array_keys($alias->varg))) {
       view_alias_create_alias($term, $alias, 'update');
     }
   }
@@ -137,7 +150,7 @@ function view_alias_taxonomy_term_update($term) {
 function view_alias_taxonomy_term_delete($term) {
   $aliasable = _get_aliasable_displays();
   foreach ($aliasable as $alias) {
-    if (in_array($term->vid, array_keys($alias->vid))) {
+    if (in_array($term->vid, array_keys($alias->varg))) {
       view_alias_delete_alias($term, $alias);
     }
   }
@@ -180,7 +193,7 @@ function view_alias_generate_multiple($vids, $term, $op, $pattern, $data, &$alia
       }
     }
     else {
-      $vid = view_alias_first_vid($vids);
+      $vid = reset($vids);
 
       if (isset($vids[$vid]['exception']['value'])) {
         $all = new stdClass();
@@ -238,14 +251,14 @@ function view_alias_create_alias($term, $alias, $op) {
   else {
     /**IDYNAMIC PATCHED for multiple terms*/
     $pattern = $alias->path;
-    foreach ($alias->vid as $vid => $vargs) {
+    foreach ($alias->varg as $vid => $vargs) {
       $pattern = preg_replace('/\%/', '[view_alias:name' . $vid . ']', $pattern, 1);
     }
     if ($pattern == '') {
       exit('empty pattern');
     }
     $data = $alias_path = array();
-    view_alias_generate_multiple($alias->vid, $term, $op, $pattern, $data, $alias_path);
+    view_alias_generate_multiple($alias->varg, $term, $op, $pattern, $data, $alias_path);
 
 //    $source = str_replace('%', $term->tid, $alias->path);
     /*
