@@ -209,7 +209,7 @@ function _get_aliasable_displays() {
     foreach($view->display as $key => $display) {
       // check default for args and save for later
       if($key == 'default') {
-        $alias->varg = _find_view_arguments($display);
+        $default_varg = _find_view_arguments($display);
         continue;
       }
 
@@ -218,19 +218,22 @@ function _get_aliasable_displays() {
         continue;
       }
 
+      // Add the display name, path and replace overridden args.
       $alias->display_name = $key;
-
-      // add the page and replace overridden args.
       $alias->path = $display->display_options['path'];
-      $overridden = _find_view_arguments($display);
-      if($overridden) {
-        $alias->varg = $overridden;
+      if (isset($display->display_options['defaults']['arguments']) &&
+        ($display->display_options['defaults']['arguments'] === FALSE)) {
+        $alias->varg = _find_view_arguments($display);
+      }
+      else {
+        // Restore default varg -- previous displays may have been overridden
+        $alias->varg = $default_varg;
       }
 
-      if(!empty($alias->path) && !empty($alias->varg))
+      if(!empty($alias->path) && !empty($alias->varg)) {
         $aliasable_views[] = drupal_clone($alias);
+      }
     }
-
   }
 
   return $aliasable_views;
@@ -240,16 +243,20 @@ function _get_aliasable_displays() {
  * helper to dig out the view arguments.
  */
 function _find_view_arguments($display) {
-  $dis_args = $display->display_options['arguments']['tid'];
-  // array_sum is used since if no vocabularies are selected, the sum of the argumets will be 0
-  // and we need to make sure there is a vocabular set
-  if($dis_args['validate_argument_type'] == 'tid' &&
-    array_sum($dis_args['validate_argument_vocabulary']) > 0) {
-    // remove zero entries
-    $no_zeroes = array_diff($dis_args['validate_argument_vocabulary'], array(0));
+  // No arguments?  Return FALSE.
+  if (empty($display->display_options['arguments'])) {
+    return FALSE;
+  }
 
-    $view_args = implode(",", $no_zeroes);
-    return $view_args;
+  // Scan the display for the first term arg.
+  // (No multiple argument support, yet)
+  foreach ($display->display_options['arguments'] as $arg_name => $argument) {
+    if ($argument['validate_type'] == 'taxonomy_term') {
+      $active_vocabularies = array_filter($argument['validate_argument_vocabulary']);
+
+      $view_args = implode(',', $active_vocabularies);
+      return ($view_args) ? $view_args : FALSE;
+    }
   }
   return FALSE;
 }
