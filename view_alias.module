@@ -29,8 +29,7 @@ function view_alias_pathauto($op) {
 }
 
 function view_alias_pattern_id($alias) {
-  $bundle = $alias->view_name . '-' . $alias->display_name;
-  return 'pathauto_view_alias_' . $bundle  . '_pattern';
+  return 'pathauto_view_alias_' . $alias->bundle  . '_pattern';
 }
 
 function view_alias_alias_pattern($path) {
@@ -65,8 +64,7 @@ function view_alias_bulk_update_batch_process(&$context) {
 function view_alias_path_alias_types() {
   $aliasable = _get_aliasable_displays();
   foreach ($aliasable as $alias) {
-    $bundle = $alias->view_name . '-' . $alias->display_name;
-    $objects[$bundle] = t('Views page displays having a path of @path', array('@path' => $alias->path));
+    $objects[$alias->bundle] = t('Views page displays having a path of @path', array('@path' => $alias->path));
   }
 
   return $objects;
@@ -232,9 +230,8 @@ function view_alias_create_alias($term, $alias, $op) {
   // switch around the pattern based on if the term id is contained within the new alias
   if (strpos($alias->path, '%') === FALSE) {
     $source = $alias->path . '/' . $term->tid;
-    variable_set('pathauto_view_alias_pattern', $alias->path . '/[term:name]');
     $data = array('term' => $term);
-    $alias_path = array( 0 => pathauto_create_alias('view_alias', $op, $source, $data, NULL, LANGUAGE_NONE));
+    $alias_path = array( 0 => pathauto_create_alias('view_alias', $op, $source, $data, $alias->bundle, LANGUAGE_NONE));
     return $alias_path;
   }
   else {
@@ -315,6 +312,8 @@ function _get_aliasable_displays() {
 
       // Add the display name, path and replace overridden args.
       $alias->display_name = $key;
+      $alias->bundle = $alias->view_name . '-' . $alias->display_name;
+
       $alias->path = $display->display_options['path'];
       if (isset($display->display_options['defaults']['arguments']) &&
         ($display->display_options['defaults']['arguments'] === FALSE)) {
