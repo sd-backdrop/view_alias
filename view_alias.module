@@ -61,13 +61,6 @@ function view_alias_path_alias_types() {
   return $objects;
 }
 
-function view_alias_first_vid($vids) {
-  foreach ($vids as $id => $vid) {
-    return $id;
-  }
-  return FALSE;
-}
-
 function view_alias_vids_tail($vids) {
   $newvids = array();
   $first = TRUE;
@@ -80,6 +73,7 @@ function view_alias_vids_tail($vids) {
   }
   return $newvids;
 }
+
 /**
  * Implements hook_form_alter().
  * remove the default form settings and add our own since view alias are different from the regular aliases
@@ -99,10 +93,17 @@ function view_alias_form_alter(&$form, &$form_state, $form_id) {
 
     $aliasable = _get_aliasable_displays();
     foreach ($aliasable as $alias) {
-      $voc = taxonomy_vocabulary_load(view_alias_first_vid($alias->vid));
+      $names = implode(', ', $alias->varg);
       $form['view_alias']['views_to_alias']['pathauto_view_alias_' . view_alias_siple_path($alias->path)] = array(
         '#type' => 'checkbox',
-        '#title' => t('View <strong> @view_name' . '</strong>, display <strong> @display_name' . '</strong>, on path <strong>@path' . '</strong>, with <strong>@name' . '</strong> arguments.', array('@view_name' => $alias->view_name, '@display_name' => $alias->display_name, '@path' => $alias->path, '@name' => $voc->name)),
+        '#title' => t('View <strong>@view_name</strong>, display <strong>@display_name</strong>, on path <strong>@path</strong>, with <strong>@name</strong> arguments.',
+            array(
+              '@view_name' => $alias->view_name,
+              '@display_name' => $alias->display_name,
+              '@path' => $alias->path,
+              '@name' => $names,
+            )
+          ),
         '#weight' => -1,
         '#default_value' => variable_get("pathauto_view_alias_" . view_alias_siple_path($alias->path), 0),
       );
@@ -285,40 +286,45 @@ function view_alias_delete_alias($term, $alias) {
  */
 function _get_aliasable_displays() {
   $aliasable_views = array();
-  $all_views = views_get_all_views();
 
-  foreach($all_views as $aview){
+  $views = views_get_all_views();
+  foreach ($views as $view) {
+    if (!empty($view->disabled)) {
+      continue;
+    }
+    if (empty($view->display)) {
+      continue;
+    }
 
     $alias = new stdClass;
-    $alias->view_name = $aview->name;
-    $default_vocab_arg;
+    $alias->view_name = $view->name;
 
-    foreach ($aview->display as $key => $display) {
-
-      $alias->display_name = $key;
-
+    foreach($view->display as $key => $display) {
       // check default for args and save for later
-      if ($key == 'default') {
-        $alias->vid = _find_view_arguments($display);
+      if($key == 'default') {
+        $default_varg = _find_view_arguments($display);
         continue;
       }
-      // its some sort of page cause the query says so.
-      else {
 
-        // Skip of display doesn't have a path
-        if (empty($display->display_options['path'])) {
-          continue;
-        }
-
-        // add the page and replace overridden args.
-        $alias->path = $display->display_options['path'];
-        $overridden = _find_view_arguments($display);
-        if ($overridden) {
-          $alias->vid = $overridden;
-        }
+      // Skip displays with no path
+      if (empty($display->display_options['path'])) {
+        continue;
       }
-      if (!empty($alias->path) && !empty($alias->vid)) {
-        $aliasable_views[$alias->path] = clone($alias);
+
+      // Add the display name, path and replace overridden args.
+      $alias->display_name = $key;
+      $alias->path = $display->display_options['path'];
+      if (isset($display->display_options['defaults']['arguments']) &&
+        ($display->display_options['defaults']['arguments'] === FALSE)) {
+        $alias->varg = _find_view_arguments($display);
+      }
+      else {
+        // Restore default varg -- previous displays may have been overridden
+        $alias->varg = $default_varg;
+      }
+
+      if(!empty($alias->path) && !empty($alias->varg)) {
+        $aliasable_views[] = clone($alias);
       }
     }
   }
@@ -330,21 +336,21 @@ function _get_aliasable_displays() {
  * helper to dig out the view arguments.
  */
 function _find_view_arguments($display) {
-
-  if (empty($display->display_options['arguments']))
+  // No arguments?  Return FALSE.
+  if (empty($display->display_options['arguments'])) {
     return FALSE;
-  $view_args = $display->display_options['arguments'];
-
-  $vids = array();
-  foreach ($view_args as $view_arg) {
-    if (isset($view_arg['validate']['type']) && $view_arg['validate']['type'] == 'taxonomy_term') {
-      if (!empty($view_arg['validate_options']['vocabularies']) && is_array($view_arg['validate_options']['vocabularies'])) {
-        foreach ($view_arg['validate_options']['vocabularies'] as $vocab_name) {
-          $vocab = taxonomy_vocabulary_machine_name_load($vocab_name);
-          $vids[$vocab->vid] = $view_arg;
-        }
-      }
-    }
   }
-  return $vids;
+
+  // Scan the display for the first term arg.
+  // (No multiple argument support, yet)
+  $view_args = array();
+  foreach ($display->display_options['arguments'] as $arg_name => $argument) {
+    // If we don't support all arguments, we can't create an alias.
+    if (($argument['validate_type'] != 'taxonomy_term') ||
+        (empty($argument['validate_options']))) {
+      return FALSE;
+    }
+    $view_args = array_filter($argument['validate_options']['vocabularies']);
+  }
+  return ($view_args) ? $view_args : FALSE;
 }
