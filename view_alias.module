@@ -223,17 +223,6 @@ function view_alias_generate_multiple($vids, $term, $op, $pattern, $data, &$alia
     return $alias_path;
 }
 
-function view_alias_tokens($type, $tokens, $data = array(), $options = array()) {
-    $replacements = array();
-    $sanitize = !empty($options['sanitize']);
-
-    if (substr($type, 0, 10) == 'view_alias') {
-      return $data;
-    }
-
-    return $replacements;
-}
-
 /**
  * Given a term, generate its view aliases.
  */
