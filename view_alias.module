@@ -17,15 +17,13 @@ function view_alias_pathauto($op) {
       $settings['module'] = 'view_alias';
       $settings['token_type'] = 'view_alias';
       $settings['groupheader'] = t('View Alias settings');
-      $settings['patterndescr'] = t('Default View Alias pattern
-        (applies to all views with a term argument and page display)');
+      $settings['patterndescr'] = t('Default View Alias pattern (applies to all views with a term argument and page display)');
       $settings['patterndefault'] = '';
       $settings['bulkname'] = t('Bulk generate aliases for views with term arguments that are not aliased');
-      $settings['bulkdescr'] = t('Generate aliases for all existing views with term arguments
-        which do not already have aliases.');
+      $settings['bulkdescr'] = t('Generate aliases for all existing views with term arguments which do not already have aliases.');
 
       // left out patterns since we dont use them.
-      $settings['placeholders'] = array( t('[cat-raw]'), t('The View argument taxonomy name'));
+      $settings['placeholders'] = array( '[cat-raw]', t('The View argument taxonomy name'));
 
       $settings['patternitems'] = array();
       return (object) $settings;
@@ -158,7 +156,7 @@ function view_alias_create_alias($term, $alias, $op) {
   }
 
   $placeholders = array(
-    'tokens' => array(t('[cat-raw]')),
+    'tokens' => array('[cat-raw]'),
     'values' => array(pathauto_cleanstring($term->name)),
   );
 
