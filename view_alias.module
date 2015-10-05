@@ -68,19 +68,6 @@ function view_alias_path_alias_types() {
   return $objects;
 }
 
-function view_alias_vids_tail($vids) {
-  $newvids = array();
-  $first = TRUE;
-  foreach ($vids as $key => $val) {
-    if ($first) {
-      $first = FALSE;
-      continue; //skip the first
-    }
-    $newvids[$key] = $val;
-  }
-  return $newvids;
-}
-
 /**
  * Implements hook_form_alter().
  * remove the default form settings and add our own since view alias are different from the regular aliases
