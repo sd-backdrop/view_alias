@@ -9,11 +9,15 @@
  * Implemntats hook_tokens()
  */
 function view_alias_tokens($type, $tokens, $data = array(), $options = array()) {
-    $replacements = array();
-    $sanitize = !empty($options['sanitize']);
+    if ($type != 'view_alias') {
+        return array();
+    }
 
-    if (substr($type, 0, 10) == 'view_alias') {
-      return $data;
+    $replacements = array();
+    foreach($tokens as $token => $raw) {
+        list($field, $token) = explode(':', $token, 2);
+        $term_tokens = token_find_with_prefix(array($token => $raw), 'term');
+        $replacements += token_generate('term', $term_tokens, array('term' => $data[$field]), $options);
     }
 
     return $replacements;

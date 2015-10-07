@@ -28,32 +28,164 @@ function view_alias_pathauto($op) {
   }
 }
 
+function view_alias_token_list($alias, $token_name) {
+  $token_list = array();
+  foreach (array_keys($alias->vargs) as $field) {
+    $token_list[$field] = '[view_alias:' . $field . ':term:' . $token_name . ']';
+  }
+  return $token_list;
+}
+
 function view_alias_pattern_id($alias) {
   return 'pathauto_view_alias_' . $alias->bundle  . '_pattern';
 }
 
-function view_alias_alias_pattern($path) {
-  return (strpos($path, '%') === FALSE) ?
-    preg_replace('/\/?$/', '/[term:name]', $path) :
-    str_replace(array('%/', '%'), '[term:name]/', $path);
+/**
+ * Convert the views path to one with tokens embedded in it.
+ */
+function view_alias_alias_pattern($alias, $token_name = 'name') {
+  $path = $alias->path;
+  $count = 0;
+  $token_list = view_alias_token_list($alias, $token_name);
+
+  // Replace each % with a token from the list.
+  $path = preg_replace(array_fill(0, count($token_list), '/%/'), $token_list, $path, 1, $count);
+
+  // Remove used tokens
+  $token_list = array_slice($token_list, $count);
+
+  // Tack on remaining tokens, if any, separated by '/'.
+  if ($token_list) {
+    $path = preg_replace('/\/?$/', '/' . implode('/', $token_list), $path);
+  }
+
+  return $path;
+}
+
+function view_alias_load_objects($alias) {
+  $alias->objects = array();
+  foreach ($alias->vargs as $field => $vargs) {
+    $objects = array();
+    foreach ($vargs as $machine_name) {
+      $voc = taxonomy_vocabulary_machine_name_load($machine_name);
+      $objects = array_merge($objects, taxonomy_get_tree($voc->vid));
+    }
+    $alias->objects[$field] = $objects;
+  }
+}
+
+/**
+ * Return the next set of objects to be processed. That is, if you have two
+ * arguments in the view, tid and tid_1, where there there 3 terms possible
+ * in argument tid and 2 in tid_1, then return the next item in the list:
+ *
+ * - 0,0
+ * - 1,0
+ * - 2,0
+ * - 0,1
+ * - 1,1
+ * - 2,1
+ *
+ *
+ * If you have three arguments, return a copy of this with 0..n in the third
+ * column.
+ *
+ * - 0,0,0
+ * - 1,0,0
+ * - 2,0,0
+ * - 0,1,0
+ * - 1,1,0
+ * - 2,1,0
+ *    ...
+ * - 0,0,n
+ * - 1,0,n
+ * - 2,0,n
+ * - 0,1,n
+ * - 1,1,n
+ * - 2,1,n
+ *
+ */
+function view_alias_next_tuple($alias) {
+  // The tuple to construct
+  $tuple = array();
+
+  if (empty($alias->last_tuple)) {
+    foreach($alias->objects as $field => $objects) {
+      $tuple[$field] = $objects[0];
+      $alias->last_tuple[$field] = 0;
+    }
+    return $tuple;
+  }
+
+  $lt = &$alias->last_tuple;
+  $advance = TRUE;
+
+  foreach($alias->objects as $field => $objects) {
+    // Do we need to advance the next one, too?
+    if ($advance) {
+      $lt[$field]++;
+      if (!empty($objects[$lt[$field]])) {
+        $tuple[$field] = $objects[$lt[$field]];
+        $advance = FALSE;
+      }
+      else {
+        $lt[$field] = 0;
+        $tuple[$field] = $objects[$lt[$field]];
+      }
+    }
+    else {
+      $tuple[$field] = $objects[$lt[$field]];
+    }
+  }
+
+  // If $advance is still set, then we have exhausted all combinations
+  return $advance ? NULL : $tuple;
 }
 
 /**
  * Batch processing callback; Generate aliases for taxonomy terms.
+ *
+ * Do this in chunks of $conf['view_alias_bulkupdate_size'] (default: 250)
  */
 function view_alias_pathauto_bulkupdate(&$context) {
-  $aliasable = _get_aliasable_displays();
-  foreach ($aliasable as $alias) {
+  static $here = FALSE;
+  // First time in?  Init our sandbox
+  if (!array_key_exists('view_alias', $context['sandbox'])) {
+    $context['sandbox']['view_alias'] = array(
+      'aliasable' => _get_aliasable_displays(),
+      'active' => 0,
+    );
+  }
+
+  $count = 0;
+
+  $aliasable = &$context['sandbox']['view_alias']['aliasable'];
+  $active = &$context['sandbox']['view_alias']['active'];
+
+  // Go though each of the view displays the admin has checked
+  while (!empty($aliasable[$active])) {
+    //
+    $alias = &$aliasable[$active];
+    view_alias_load_objects($alias);
+
     if (variable_get(view_alias_pattern_id($alias), FALSE)) {
-      foreach ($alias->varg as $machine_name) {
-        $voc = taxonomy_vocabulary_machine_name_load($machine_name);
-        $terms = taxonomy_get_tree($voc->vid);
-        foreach ($terms as $term) {
-          view_alias_create_alias($term, $alias, 'bulkupdate');
+      while ($data = view_alias_next_tuple($alias)) {
+        view_alias_create_alias($data, $alias, 'bulkupdate');
+
+        if ($count++ > variable_get('view_alias_bulkupdate_size', 250)) {
+          unset($alias->objects);
+          $context['finished'] = FALSE;
+          return;
         }
       }
+      unset($alias->last_tuple);
     }
+
+    unset($alias->objects);
+    $active++;
   }
+
+  $context['finished'] = TRUE;
 }
 
 /**
@@ -86,22 +218,30 @@ function view_alias_form_alter(&$form, &$form_state, $form_id) {
 
     $aliasable = _get_aliasable_displays();
     foreach ($aliasable as $alias) {
-      $names = implode(', ', $alias->varg);
+      $name_list = array();
+      foreach ($alias->vargs as $field => $varg) {
+        $name_list[] = t('%field (%vocabs)', array(
+            '%field' => $field,
+            '%vocabs' => implode(', ', $varg),
+          )
+        );
+      }
+      $names = implode(', ', $name_list);
       $pattern_id = view_alias_pattern_id($alias);
-      $pattern = view_alias_alias_pattern($alias->path);
+      $pattern = view_alias_alias_pattern($alias);
       $form['view_alias']['views_to_alias'][$pattern_id] = array(
         '#type' => 'checkbox',
-        '#title' => t('View <strong>@view_name</strong>, display <strong>@display_name</strong>, on path <strong>@path</strong>, with <strong>@name</strong> arguments.',
+        '#title' => t('View <strong>@view_name</strong>, display <strong>@display_name</strong>, on path <strong>@path</strong>, with arguments <strong>!arg_list</strong> .',
             array(
               '@view_name' => $alias->view_name,
               '@display_name' => $alias->display_name,
               '@path' => $alias->path,
-              '@name' => $names,
+              '!arg_list' => $names,
             )
           ),
         '#weight' => -1,
         '#return_value' => $pattern,
-        '#default_value' => (variable_get($pattern_id, FALSE) == $pattern),
+        '#default_value' => (variable_get($pattern_id, FALSE) === $pattern),
       );
     }
   }
@@ -141,19 +281,19 @@ function view_alias_taxonomy_term_delete($term) {
 
 /**
  * Given a term, generate its view aliases.
+ *
+ * @param $args array of field and terms
+ *
+ * @param $alias object Alias object from _get_aliasable_displays()
+ *
+ * @param $op string Operation to pass to pathauto_create_alias
  */
-function view_alias_create_alias($term, $alias, $op) {
+function view_alias_create_alias($args, $alias, $op) {
   module_load_include('inc', 'pathauto');
 
-  // switch around the pattern based on if the term id is contained within the new alias
-  if (strpos($alias->path, '%') === FALSE) {
-    $source = $alias->path . '/' . $term->tid;
-  }
-  else {
-    $source = str_replace('%', $term->tid, $alias->path);
-  }
-  $data = array('term' => $term);
-  $alias_path = array( 0 => pathauto_create_alias('view_alias', $op, $source, $data, $alias->bundle, LANGUAGE_NONE));
+  $source = view_alias_alias_pattern($alias, 'tid');
+  $source = token_replace($source, $args);
+  $alias_path = array( 0 => pathauto_create_alias('view_alias', $op, $source, $args, $alias->bundle, LANGUAGE_NONE));
   return $alias_path;
 }
 
@@ -217,14 +357,14 @@ function _get_aliasable_displays() {
       $alias->path = $display->display_options['path'];
       if (isset($display->display_options['defaults']['arguments']) &&
         ($display->display_options['defaults']['arguments'] === FALSE)) {
-        $alias->varg = _find_view_arguments($display);
+        $alias->vargs = _find_view_arguments($display);
       }
       else {
         // Restore default varg -- previous displays may have been overridden
-        $alias->varg = $default_varg;
+        $alias->vargs = $default_varg;
       }
 
-      if(!empty($alias->path) && !empty($alias->varg)) {
+      if(!empty($alias->path) && !empty($alias->vargs)) {
         $aliasable_views[] = clone($alias);
       }
     }
@@ -251,7 +391,7 @@ function _find_view_arguments($display) {
         ($argument['validate']['type'] != 'taxonomy_term')) {
       return FALSE;
     }
-    $view_args = array_filter($argument['validate_options']['vocabularies']);
+    $view_args[$arg_name] = array_filter($argument['validate_options']['vocabularies']);
   }
   return ($view_args) ? $view_args : FALSE;
 }
