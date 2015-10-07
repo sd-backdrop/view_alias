@@ -28,7 +28,7 @@ function view_alias_pathauto($op) {
   }
 }
 
-function view_alias_token_list($alias, $token_name) {
+function view_alias_get_token_list_for_alias($alias, $token_name) {
   $token_list = array();
   foreach (array_keys($alias->vargs) as $field) {
     $token_list[$field] = '[view_alias:' . $field . ':term:' . $token_name . ']';
@@ -46,7 +46,7 @@ function view_alias_pattern_id($alias) {
 function view_alias_alias_pattern($alias, $token_name = 'name') {
   $path = $alias->path;
   $count = 0;
-  $token_list = view_alias_token_list($alias, $token_name);
+  $token_list = view_alias_get_token_list_for_alias($alias, $token_name);
 
   // Replace each % with a token from the list.
   $path = preg_replace(array_fill(0, count($token_list), '/%/'), $token_list, $path, 1, $count);
