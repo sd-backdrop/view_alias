@@ -247,8 +247,8 @@ function _find_view_arguments($display) {
   $view_args = array();
   foreach ($display->display_options['arguments'] as $arg_name => $argument) {
     // If we don't support all arguments, we can't create an alias.
-    if (($argument['validate_type'] != 'taxonomy_term') ||
-        (empty($argument['validate_options']))) {
+    if (empty($argument['validate']) || empty($argument['validate_options']) ||
+        ($argument['validate']['type'] != 'taxonomy_term')) {
       return FALSE;
     }
     $view_args = array_filter($argument['validate_options']['vocabularies']);
