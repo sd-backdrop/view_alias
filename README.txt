@@ -22,7 +22,7 @@ is the results of that effort.
 SETUP
 1. untar the tarball into your drupal modules directory
 2. enable the module
-3. visit admin/build/path/pathauto for configuration options.
+3. visit admin/config/search/path for configuration options.
 
 Generating Aliases
 View Alias is integrated with pathauto, (admin/config/search/path).  So, expand
@@ -55,7 +55,7 @@ Any of the tokens listed in the Taxonomy Term Paths Replacement Patterns list
 are available.
 
 The text field for each view has a "default" listed below it that can be
-copy/pasted into the textfield to provide direct term name replacements of
+copy/pasted into the text field to provide direct term name replacements of
 the arguments in the views path.
 
 Leaving a text field blank will disable aliasing for that view.
