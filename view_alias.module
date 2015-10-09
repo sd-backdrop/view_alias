@@ -247,18 +247,22 @@ function view_alias_form_alter(&$form, &$form_state, $form_id) {
       $pattern_id = view_alias_pattern_id($alias);
       $pattern = view_alias_alias_pattern($alias);
       $form['view_alias']['views_to_alias'][$pattern_id] = array(
-        '#type' => 'checkbox',
-        '#title' => t('View <strong>@view_name</strong>, display <strong>@display_name</strong>, on path <strong>@path</strong>, with arguments <strong>!arg_list</strong> .',
+        '#type' => 'textfield',
+        '#title' => t('View %view_name, display %display_name, on path %path, with arguments !arg_list.',
             array(
-              '@view_name' => $alias->view_name,
-              '@display_name' => $alias->display_name,
-              '@path' => $alias->path,
+              '%view_name' => $alias->view_name,
+              '%display_name' => $alias->display_name,
+              '%path' => $alias->path,
               '!arg_list' => $names,
             )
           ),
         '#weight' => -1,
-        '#return_value' => $pattern,
-        '#default_value' => (variable_get($pattern_id, FALSE) === $pattern),
+        '#default_value' => variable_get($pattern_id, view_alias_alias_pattern($alias)),
+        '#description' => t('Default value is %pattern', array('%pattern' => view_alias_alias_pattern($alias))),
+      );
+      $form['view_alias']['views_to_alias']['directions'] = array(
+        '#type' => 'markup',
+        '#markup' => t('Valid tokens are any taxonomy term token prefixed with <strong>view_alias:<em>argument_name</em></strong>.  E.g., <code>[view_alias:tid:term:name]</code> or <code>[view_alias:term_node_tid_depth:term:parents:join:?]</code>'),
       );
     }
   }
