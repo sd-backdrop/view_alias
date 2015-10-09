@@ -265,38 +265,6 @@ function view_alias_form_alter(&$form, &$form_state, $form_id) {
 }
 
 /**
- * Implements hook_taxonomy_term_insert().
- */
-function view_alias_taxonomy_term_insert($term) {
-  $aliasable = _get_aliasable_displays();
-  foreach ($aliasable as $alias) {
-    if (in_array($term->vocabulary_machine_name, array_keys($alias->varg))) {
-      view_alias_create_alias($term, $alias, 'update');
-    }
-  }
-}
-
-/**
- * Implements hook_taxonomy_term_update().
- */
-function view_alias_taxonomy_term_update($term) {
-  view_alias_taxonomy_term_delete($term);
-  view_alias_taxonomy_term_insert($term);
-}
-
-/**
- * Implements hook_taxonomy_term_delete().
- */
-function view_alias_taxonomy_term_delete($term) {
-  $aliasable = _get_aliasable_displays();
-  foreach ($aliasable as $alias) {
-    if (in_array($term->vocabulary_machine_name, array_keys($alias->varg))) {
-      view_alias_delete_alias($term, $alias);
-    }
-  }
-}
-
-/**
  * Given a term, generate its view aliases.
  *
  * @param $args array of field and terms
