@@ -165,19 +165,18 @@ function view_alias_next_tuple($alias) {
  * Do this in chunks of $conf['view_alias_bulkupdate_size'] (default: 250)
  */
 function view_alias_pathauto_bulkupdate(&$context) {
-  static $here = FALSE;
   // First time in?  Init our sandbox
   if (!array_key_exists('view_alias', $context['sandbox'])) {
     $context['sandbox']['view_alias'] = array(
       'aliasable' => _get_aliasable_displays(),
       'active' => 0,
+      'count' => 0,
     );
   }
 
-  $count = 0;
-
   $aliasable = &$context['sandbox']['view_alias']['aliasable'];
   $active = &$context['sandbox']['view_alias']['active'];
+  $count = &$context['sandbox']['view_alias']['count'];
 
   // Go though each of the view displays the admin has checked
   while (!empty($aliasable[$active])) {
@@ -189,9 +188,11 @@ function view_alias_pathauto_bulkupdate(&$context) {
       while ($data = view_alias_next_tuple($alias)) {
         view_alias_create_alias($data, $alias, 'bulkupdate');
 
-        if ($count++ > variable_get('view_alias_bulkupdate_size', 250)) {
+        $count++;
+        if ($count % variable_get('view_alias_bulkupdate_size', 250) == 0) {
           unset($alias->objects);
           $context['finished'] = FALSE;
+          $context['message'] = t('Aliased @count views path(s)', array('@count' => $count));
           return;
         }
       }
