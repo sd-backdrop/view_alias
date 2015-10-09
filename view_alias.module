@@ -28,11 +28,19 @@ function view_alias_pathauto($op) {
   }
 }
 
-function view_alias_get_token_list_for_alias($alias, $token_name) {
+function view_alias_get_token_list_for_alias($alias, $source = FALSE) {
   $token_list = array();
-  foreach (array_keys($alias->vargs) as $field) {
-    $token_list[$field] = '[view_alias:' . $field . ':term:' . $token_name . ']';
+  foreach ($alias->vargs as $field => $vargs) {
+    if (!$source && !empty($vargs['options']['depth'])) {
+      $token_list[$field] = '[view_alias:' . $field . ':term:parents:join:/]';
+      $token_list[$field] .= '/[view_alias:' . $field . ':term:name]';
+    }
+    else {
+      $token_name = $source ? 'tid' : 'name';
+      $token_list[$field] = '[view_alias:' . $field . ':term:' . $token_name . ']';
+    }
   }
+
   return $token_list;
 }
 
@@ -40,13 +48,22 @@ function view_alias_pattern_id($alias) {
   return 'pathauto_view_alias_' . $alias->bundle  . '_pattern';
 }
 
+function view_alias_source_pattern($alias) {
+  $token_list = view_alias_get_token_list_for_alias($alias, TRUE);
+  return view_alias_make_pattern($alias, $token_list);
+}
+
+function view_alias_alias_pattern($alias) {
+  $token_list = view_alias_get_token_list_for_alias($alias, FALSE);
+  return view_alias_make_pattern($alias, $token_list);
+}
+
 /**
  * Convert the views path to one with tokens embedded in it.
  */
-function view_alias_alias_pattern($alias, $token_name = 'name') {
+function view_alias_make_pattern($alias, $token_list) {
   $path = $alias->path;
   $count = 0;
-  $token_list = view_alias_get_token_list_for_alias($alias, $token_name);
 
   // Replace each % with a token from the list.
   $path = preg_replace(array_fill(0, count($token_list), '/%/'), $token_list, $path, 1, $count);
@@ -66,7 +83,7 @@ function view_alias_load_objects($alias) {
   $alias->objects = array();
   foreach ($alias->vargs as $field => $vargs) {
     $objects = array();
-    foreach ($vargs as $machine_name) {
+    foreach ($vargs['vocabularies'] as $machine_name) {
       $voc = taxonomy_vocabulary_machine_name_load($machine_name);
       $objects = array_merge($objects, taxonomy_get_tree($voc->vid));
     }
@@ -222,7 +239,7 @@ function view_alias_form_alter(&$form, &$form_state, $form_id) {
       foreach ($alias->vargs as $field => $varg) {
         $name_list[] = t('%field (%vocabs)', array(
             '%field' => $field,
-            '%vocabs' => implode(', ', $varg),
+            '%vocabs' => implode(', ', $varg['vocabularies']),
           )
         );
       }
@@ -291,7 +308,7 @@ function view_alias_taxonomy_term_delete($term) {
 function view_alias_create_alias($args, $alias, $op) {
   module_load_include('inc', 'pathauto');
 
-  $source = view_alias_alias_pattern($alias, 'tid');
+  $source = view_alias_source_pattern($alias);
   $source = token_replace($source, $args);
   $alias_path = array( 0 => pathauto_create_alias('view_alias', $op, $source, $args, $alias->bundle, LANGUAGE_NONE));
   return $alias_path;
@@ -391,7 +408,11 @@ function _find_view_arguments($display) {
         ($argument['validate']['type'] != 'taxonomy_term')) {
       return FALSE;
     }
-    $view_args[$arg_name] = array_filter($argument['validate_options']['vocabularies']);
+    $view_args[$arg_name]['vocabularies'] = array_filter($argument['validate_options']['vocabularies']);
+    $view_args[$arg_name]['options'] = array();
+    if(array_key_exists('depth', $argument)) {
+      $view_args[$arg_name]['options']['depth'] = $argument['depth'];
+    }
   }
   return ($view_args) ? $view_args : FALSE;
 }
