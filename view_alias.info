@@ -5,6 +5,3 @@ package = Views
 
 dependencies[] = pathauto
 dependencies[] = views
-
-; Handlers
-files[] = view_alias.module
